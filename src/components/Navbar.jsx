@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useProperties } from '../context/PropertyContext';
+import { useAuth } from '../context/AuthContext';
 
 export default function Navbar() {
   const { currency, setCurrency, favorites } = useProperties();
+  const { isAdmin, logout } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
@@ -108,17 +110,36 @@ export default function Navbar() {
             </div>
 
             {/* Admin Switcher */}
-            <Link 
-              to="/admin" 
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
-                location.pathname.startsWith('/admin')
-                  ? 'bg-mosque text-white shadow-md'
-                  : 'bg-white dark:bg-white/5 border border-nordic/10 text-nordic hover:border-mosque dark:hover:border-white/20 hover:text-mosque dark:text-white'
-              }`}
-            >
-              <span className="material-icons text-base">dashboard</span>
-              <span>Modo Admin</span>
-            </Link>
+            {isAdmin ? (
+              <div className="flex items-center gap-2">
+                <Link
+                  to="/admin"
+                  className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
+                    location.pathname.startsWith('/admin')
+                      ? 'bg-mosque text-white shadow-md'
+                      : 'bg-white dark:bg-white/5 border border-nordic/10 text-nordic hover:border-mosque dark:hover:border-white/20 hover:text-mosque dark:text-white'
+                  }`}
+                >
+                  <span className="material-icons text-base">dashboard</span>
+                  <span>Panel Admin</span>
+                </Link>
+                <button
+                  onClick={() => { logout(); navigate('/'); }}
+                  title="Cerrar sesión admin"
+                  className="flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-semibold bg-red-50 dark:bg-red-900/20 border border-red-200/60 dark:border-red-800/40 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/40 transition-all"
+                >
+                  <span className="material-icons text-base">logout</span>
+                </button>
+              </div>
+            ) : (
+              <Link
+                to="/admin/login"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-white dark:bg-white/5 border border-nordic/10 text-nordic hover:border-mosque dark:hover:border-white/20 hover:text-mosque dark:text-white transition-all"
+              >
+                <span className="material-icons text-base">admin_panel_settings</span>
+                <span>Modo Admin</span>
+              </Link>
+            )}
 
             {/* Mobile Menu Button */}
             <button 
