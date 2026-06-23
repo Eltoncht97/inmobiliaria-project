@@ -2,31 +2,69 @@ import React, { createContext, useState, useContext } from 'react';
 
 const AuthContext = createContext();
 
-// Hardcoded credentials (basic auth)
-const ADMIN_USER = 'admin';
-const ADMIN_PASS = 'admin123';
-
 export const AuthProvider = ({ children }) => {
-  const [isAdmin, setIsAdmin] = useState(() => {
-    return localStorage.getItem('luxe_admin_auth') === 'true';
+  const [user, setUser] = useState(() => {
+    const saved = localStorage.getItem('luxe_user');
+    return saved ? JSON.parse(saved) : null;
   });
+  const [token, setToken] = useState(() => localStorage.getItem('luxe_token') || null);
 
-  const login = (username, password) => {
-    if (username === ADMIN_USER && password === ADMIN_PASS) {
-      setIsAdmin(true);
-      localStorage.setItem('luxe_admin_auth', 'true');
+  const isAuthenticated = !!token;
+
+  const login = async (email, password) => {
+    try {
+      const res = await fetch('http://localhost:4001/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        return { success: false, error: err.error || 'Login failed' };
+      }
+      const data = await res.json();
+      setToken(data.token);
+      setUser(data.user);
+      localStorage.setItem('luxe_token', data.token);
+      localStorage.setItem('luxe_user', JSON.stringify(data.user));
       return { success: true };
+    } catch (err) {
+      console.error(err);
+      return { success: false, error: 'Network error' };
     }
-    return { success: false, error: 'Usuario o contraseña incorrectos.' };
+  };
+
+  const register = async (name, email, password) => {
+    try {
+      const res = await fetch('http://localhost:4001/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, password })
+      });
+      if (!res.ok) return { success: false, error: (await res.json()).error };
+      const data = await res.json();
+      setToken(data.token);
+      setUser(data.user);
+      localStorage.setItem('luxe_token', data.token);
+      localStorage.setItem('luxe_user', JSON.stringify(data.user));
+      return { success: true };
+    } catch (err) {
+      console.error(err);
+      return { success: false, error: 'Network error' };
+    }
   };
 
   const logout = () => {
-    setIsAdmin(false);
-    localStorage.removeItem('luxe_admin_auth');
+    setToken(null);
+    setUser(null);
+    localStorage.removeItem('luxe_token');
+    localStorage.removeItem('luxe_user');
   };
 
+  const getAuthHeader = () => (token ? { Authorization: `Bearer ${token}` } : {});
+
   return (
-    <AuthContext.Provider value={{ isAdmin, login, logout }}>
+    <AuthContext.Provider value={{ user, token, isAuthenticated, login, register, logout, getAuthHeader }}>
       {children}
     </AuthContext.Provider>
   );

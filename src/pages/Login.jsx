@@ -20,12 +20,13 @@ export default function Login() {
     // Simula pequeño delay para UX
     await new Promise(res => setTimeout(res, 500));
 
-    const result = login(username, password);
+    const result = await login(username, password);
 
     if (result.success) {
+      setIsLoading(false);
       navigate('/admin');
     } else {
-      setError(result.error);
+      setError(result.error || 'Error de autenticación');
       setIsLoading(false);
     }
   };

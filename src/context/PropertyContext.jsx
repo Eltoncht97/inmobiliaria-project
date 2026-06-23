@@ -1,5 +1,6 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import { mockProperties } from '../data/mockProperties';
+import { useAuth } from './AuthContext';
 
 const PropertyContext = createContext();
 
@@ -7,7 +8,7 @@ export const PropertyProvider = ({ children }) => {
   // Properties State
   const [properties, setProperties] = useState(() => {
     const saved = localStorage.getItem('luxe_properties');
-    return saved ? JSON.parse(saved) : mockProperties;
+    return saved ? JSON.parse(saved) : [];
   });
 
   // Favorites State (Array of Property IDs)
@@ -41,6 +42,24 @@ export const PropertyProvider = ({ children }) => {
     localStorage.setItem('luxe_properties', JSON.stringify(properties));
   }, [properties]);
 
+  // Fetch properties from backend on mount
+  useEffect(() => {
+    const fetchProps = async () => {
+      try {
+        const res = await fetch('http://localhost:4001/properties');
+        if (!res.ok) throw new Error('Failed to fetch');
+        const data = await res.json();
+        setProperties(data);
+      } catch (err) {
+        console.error('Could not fetch properties:', err);
+        // Fallback to mock if available
+        const saved = localStorage.getItem('luxe_properties');
+        if (!saved) setProperties(mockProperties);
+      }
+    };
+    fetchProps();
+  }, []);
+
   useEffect(() => {
     localStorage.setItem('luxe_favorites', JSON.stringify(favorites));
   }, [favorites]);
@@ -68,28 +87,39 @@ export const PropertyProvider = ({ children }) => {
     });
   };
 
+  const { getAuthHeader } = useAuth();
+
   const addProperty = (property) => {
-    const newProperty = {
-      ...property,
-      id: Date.now().toString(),
-      priceUsd: Number(property.priceUsd)
-    };
-    setProperties(prev => [newProperty, ...prev]);
-    return newProperty.id;
+    // create on backend then update local state
+    return fetch('http://localhost:4001/properties', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(getAuthHeader()) },
+      body: JSON.stringify(property)
+    }).then(res => res.json()).then(created => {
+      setProperties(prev => [created, ...prev]);
+      return created.id;
+    });
   };
 
   const updateProperty = (updatedProperty) => {
-    setProperties(prev => prev.map(prop => 
-      prop.id === updatedProperty.id 
-        ? { ...updatedProperty, priceUsd: Number(updatedProperty.priceUsd) } 
-        : prop
-    ));
+    // send update to backend
+    fetch(`http://localhost:4001/properties/${updatedProperty.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...(getAuthHeader()) },
+      body: JSON.stringify(updatedProperty)
+    }).then(res => res.json()).then(updated => {
+      setProperties(prev => prev.map(prop => prop.id === updated.id ? updated : prop));
+    }).catch(err => console.error('Update failed', err));
   };
 
   const deleteProperty = (propertyId) => {
-    setProperties(prev => prev.filter(prop => prop.id !== propertyId));
-    // Also remove from favorites if deleted
-    setFavorites(prev => prev.filter(id => id !== propertyId));
+    fetch(`http://localhost:4001/properties/${propertyId}`, { method: 'DELETE', headers: { ...(getAuthHeader()) } })
+      .then(res => {
+        if (!res.ok) throw new Error('Delete failed');
+        setProperties(prev => prev.filter(prop => prop.id !== propertyId));
+        setFavorites(prev => prev.filter(id => id !== propertyId));
+      })
+      .catch(err => console.error('Delete error', err));
   };
 
   const addAppointment = (appointment) => {
